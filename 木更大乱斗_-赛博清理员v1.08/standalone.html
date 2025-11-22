@@ -1,0 +1,216 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>木更大乱斗：赛博清理员</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 React 和 Babel -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&display=swap');
+
+      body {
+        font-family: 'Noto Sans SC', sans-serif;
+        background-color: #000;
+        color: #e2e8f0;
+        overflow: hidden;
+        touch-action: none;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+      }
+
+      .glitch-text { position: relative; }
+      .glitch-text::before, .glitch-text::after {
+        content: attr(data-text);
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+      }
+      .glitch-text::before {
+        left: 2px; text-shadow: -1px 0 #ff00c1;
+        clip: rect(44px, 450px, 56px, 0);
+        animation: glitch-anim 5s infinite linear alternate-reverse;
+      }
+      .glitch-text::after {
+        left: -2px; text-shadow: -1px 0 #00fff9;
+        clip: rect(44px, 450px, 56px, 0);
+        animation: glitch-anim2 5s infinite linear alternate-reverse;
+      }
+      @keyframes glitch-anim {
+        0% { clip: rect(30px, 9999px, 10px, 0); }
+        20% { clip: rect(80px, 9999px, 90px, 0); }
+        40% { clip: rect(10px, 9999px, 50px, 0); }
+        60% { clip: rect(40px, 9999px, 20px, 0); }
+        80% { clip: rect(70px, 9999px, 60px, 0); }
+        100% { clip: rect(20px, 9999px, 80px, 0); }
+      }
+      @keyframes glitch-anim2 {
+        0% { clip: rect(10px, 9999px, 80px, 0); }
+        20% { clip: rect(40px, 9999px, 10px, 0); }
+        40% { clip: rect(80px, 9999px, 50px, 0); }
+        60% { clip: rect(20px, 9999px, 90px, 0); }
+        80% { clip: rect(50px, 9999px, 20px, 0); }
+        100% { clip: rect(30px, 9999px, 60px, 0); }
+      }
+      
+      .scrollbar-hide::-webkit-scrollbar { display: none; }
+      .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+      /* Animations */
+      @keyframes bounce-in {
+          0% { transform: scale(0.3); opacity: 0; }
+          50% { transform: scale(1.05); opacity: 1; }
+          70% { transform: scale(0.9); }
+          100% { transform: scale(1); }
+      }
+      .animate-bounce-in { animation: bounce-in 0.5s cubic-bezier(0.215, 0.610, 0.355, 1.000) both; }
+      
+      @keyframes pop-in {
+          0% { transform: scale(0); opacity: 0; }
+          80% { transform: scale(1.1); opacity: 1; }
+          100% { transform: scale(1); }
+      }
+      .animate-pop-in { animation: pop-in 0.3s ease-out forwards; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <!-- 核心游戏逻辑脚本 (Babel编译) -->
+    <script type="text/babel" data-presets="react,typescript">
+        const { useState, useEffect, useRef, useCallback } = React;
+
+        // --- 1. TYPES ---
+        enum GamePhase {
+            WELCOME = 'WELCOME',
+            STORY = 'STORY', 
+            PLAYING = 'PLAYING',
+            SHOP = 'SHOP',
+            BOSS_INTRO = 'BOSS_INTRO',
+            GAME_OVER = 'GAME_OVER',
+            VICTORY = 'VICTORY',
+        }
+
+        // --- 2. DATA (Meme Content) ---
+        const DEATH_MESSAGES = {
+            'keyboard_man': "你被键盘侠喷到怀疑人生，直接退网了。",
+            'tian_gou': "你被舔狗的真心感动（恶心）死了。",
+            'lemon_head': "你被酸死了。这就破防了？",
+            'gai_liu_zi': "你在街头被鬼火少年撞飞，社保都没得赔。",
+            'chi_gua': "你在围观群众的瓜子壳海洋中窒息了。",
+            'da_ye': "大爷使用了'退退退'，你被物理超度了。",
+            'marketing_account': "你被营销号的谣言洗脑，变成了傻子。",
+            'clown': "小丑竟是你自己。",
+            'minion': "你被当成垃圾清理掉了。",
+            'tao_wa_big': "你被无限套娃困在循环里出不来了。",
+            'tao_wa_med': "你倒在了套娃的第二层。",
+            'tao_wa_small': "你竟然被最小的套娃干掉了？",
+            'river_crab': "你的内容违规，已被河蟹屏蔽。",
+            'boss_kpi': "你被公司'结构性优化'了。请立刻办理离职手续。",
+            'unknown': "你猝死了。这就是996的福报。"
+        };
+
+        const ENEMIES = {
+            'keyboard_man': {
+                type: 'keyboard_man', emoji: '⌨️', hp: 30, speed: 2, damage: 10, score: 15,
+                description: "野生键盘侠，擅长远程输出观点，只要还在打字就是无敌的。",
+                behavior: 'shooter', projectileChar: '急', projectileOptions: ["急", "典", "孝", "乐", "崩", "赢", "麻"],
+                attackPattern: 'single', sizeScale: 1.0, projectileSize: 20, projectileColor: '#f87171',
+                deathQuotes: ["急了急了", "我键盘坏了", "不至于吧", "典", "我不服"]
+            },
+            'tian_gou': {
+                type: 'tian_gou', emoji: '🐶', hp: 25, speed: 4.5, damage: 8, score: 8,
+                description: "忠诚的舔狗，看到女神就会不顾一切冲上来，速度极快。",
+                behavior: 'chase', sizeScale: 0.8, deathQuotes: ["女神...", "在吗", "早安", "我错了", "汪"]
+            },
+            'lemon_head': {
+                type: 'lemon_head', emoji: '🍋', hp: 50, speed: 1.5, damage: 10, score: 12,
+                description: "柠檬精，死亡后留下酸液池，踩上去会大幅减速。",
+                behavior: 'chase', sizeScale: 0.9, deathQuotes: ["酸了", "恰柠檬", "你什么家庭", "真酸", "呵呵"]
+            },
+            'gai_liu_zi': {
+                type: 'gai_liu_zi', emoji: '🕺', hp: 45, speed: 5, damage: 12, score: 20,
+                description: "该溜子，没事到处晃悠，偶尔会发起极速鬼火冲撞，注意躲避！",
+                behavior: 'circle', sizeScale: 1.1, deathQuotes: ["摇起来", "别扒拉我", "给你脸了", "花手"]
+            },
+            'chi_gua': {
+                type: 'chi_gua', emoji: '🍉', hp: 80, speed: 0.5, damage: 15, score: 25,
+                description: "吃瓜群众，前排围观，虽然不动但会吐瓜子（子弹）。",
+                behavior: 'turret', projectileChar: '瓜', projectileSize: 22, attackPattern: 'single',
+                projectileColor: '#22c55e', sizeScale: 1.2, deathQuotes: ["保熟吗", "吃瓜", "前排", "这就完了？"]
+            },
+            'da_ye': {
+                type: 'da_ye', emoji: '👴', hp: 200, speed: 1.2, damage: 30, score: 40,
+                description: "小区大爷，会发射延迟爆炸的“退退退”法术，血量极厚。",
+                behavior: 'tank', projectileChar: '退', projectileSize: 40, attackPattern: 'explode',
+                projectileColor: '#fbbf24', sizeScale: 1.8, deathQuotes: ["年轻人", "不讲武德", "耗子尾汁", "大意了"]
+            },
+            'marketing_account': {
+                type: 'marketing_account', emoji: '📢', hp: 90, speed: 1, damage: 15, score: 30,
+                description: "营销号，一张嘴就是散弹谣言，令人防不胜防。",
+                behavior: 'shooter', projectileChar: '谣', attackPattern: 'spread', sizeScale: 1.5,
+                projectileSize: 24, projectileColor: '#a855f7', deathQuotes: ["震惊！", "看哭了", "删前速看", "家人们谁懂", "纯路人"]
+            },
+            'clown': {
+                type: 'clown', emoji: '🤡', hp: 70, speed: 3.5, damage: 18, score: 25,
+                description: "小丑，不仅是心理上的，物理上也会像疯子一样冲过来。",
+                behavior: 'rusher', sizeScale: 1.2, deathQuotes: ["小丑竟是我", "玩不起？", "原来我是小丑", "别急", "这就破防了"]
+            },
+            'minion': {
+                type: 'minion', emoji: '🔨', hp: 40, speed: 2.5, damage: 5, score: 5,
+                description: "工具人，毫无感情的打工机器，会随机游走。",
+                behavior: 'minion', sizeScale: 0.6, deathQuotes: ["我是自愿的", "996福报", "我爱加班", "收到"]
+            },
+            'tao_wa_big': {
+                type: 'tao_wa_big', emoji: '📦', hp: 120, speed: 1.5, damage: 15, score: 30,
+                description: "禁止套娃（大），打死后会分裂出两个中型套娃。",
+                behavior: 'chase', sizeScale: 1.5, deathQuotes: ["还没完呢", "再来", "套娃开始"]
+            },
+            'tao_wa_med': {
+                type: 'tao_wa_med', emoji: '🥡', hp: 60, speed: 2, damage: 10, score: 15,
+                description: "禁止套娃（中），打死后会分裂出两个小型套娃。",
+                behavior: 'chase', sizeScale: 1.0, deathQuotes: ["还有", "继续"]
+            },
+            'tao_wa_small': {
+                type: 'tao_wa_small', emoji: '🍬', hp: 30, speed: 3, damage: 5, score: 5,
+                description: "禁止套娃（小），终于到头了。",
+                behavior: 'chase', sizeScale: 0.7, deathQuotes: ["结束了", "没了"]
+            },
+            'river_crab': {
+                type: 'river_crab', emoji: '🦀', hp: 150, speed: 3, damage: 20, score: 35,
+                description: "河蟹，横行霸道，虽然不怎么打人但是挡路且很硬。",
+                behavior: 'rusher', sizeScale: 1.4, deathQuotes: ["被夹了", "和谐", "404"]
+            },
+            'boss_kpi': {
+                type: 'boss_kpi', emoji: '👹', hp: 5000, speed: 2.5, damage: 25, score: 10000,
+                description: "KPI大魔王，掌握着你的生杀大权，二阶段会更加疯狂。",
+                behavior: 'boss', projectileChar: '裁', attackPattern: 'spiral', sizeScale: 4.5,
+                projectileSize: 35, projectileColor: '#ef4444', deathQuotes: ["公司需要降本增效...", "这不符合底层逻辑...", "我的期权..."]
+            }
+        };
+
+        const WAVES = [
+            { waveNumber: 1, duration: 60, enemies: [{ type: 'tian_gou', weight: 8 }, { type: 'keyboard_man', weight: 2 }], spawnRate: 60 },
+            { waveNumber: 2, duration: 60, enemies: [{ type: 'tian_gou', weight: 4 }, { type: 'keyboard_man', weight: 4 }, { type: 'lemon_head', weight: 2 }], spawnRate: 55 },
+            { waveNumber: 3, duration: 60, enemies: [{ type: 'tao_wa_big', weight: 3 }, { type: 'gai_liu_zi', weight: 3 }, { type: 'chi_gua', weight: 3 }], spawnRate: 50 },
+            { waveNumber: 4, duration: 60, enemies: [{ type: 'clown', weight: 3 }, { type: 'marketing_account', weight: 4 }, { type: 'river_crab', weight: 2 }, { type: 'gai_liu_zi', weight: 2 }], spawnRate: 45 },
+            { waveNumber: 5, duration: 60, enemies: [{ type: 'da_ye', weight: 3 }, { type: 'chi_gua', weight: 3 }, { type: 'tao_wa_big', weight: 3 }], spawnRate: 40 },
+            { waveNumber: 6, duration: 60, enemies: [{ type: 'marketing_account', weight: 4 }, { type: 'river_crab', weight: 3 }, { type: 'lemon_head', weight: 4 }], spawnRate: 35 },
+            { waveNumber: 7, duration: 60, enemies: [{ type: 'gai_liu_zi', weight: 5 }, { type: 'clown', weight: 4 }, { type: 'da_ye', weight: 2 }, { type: 'tao_wa_big', weight: 2 }], spawnRate: 30 },
+            { waveNumber: 8, duration: 999, enemies: [{ type: 'boss_kpi', weight: 1 }], spawnRate: 99999, isBossWave: true }
+        ];
+
+        const SHOP_ITEMS = [
+            { id: 'keyboard_cleaner', title: '键盘清理泥', description: '基础伤害 +1。前期神器。', rarity: 'common', category: 'upgrade', price: 30, icon: '🧹', effect: (state) => { state.player.attackDamage += 1; } },
+            { id: 'mechanical_keyboard', title: '机械键盘', description: '攻速 +15%，打字如飞。', rarity: 'common', category: 'upgrade', price: 50, icon: '⌨️', effect: (state) => { state.player.attackSpeed = Math.max(5, state.player.attackSpeed * 0.85); } },
+            { id: 'big_lung', title: '大嗓门', description: '伤害 +20%，输出全靠吼。(第3波后解锁)', rarity: 'common', category: 'upgrade', minWave: 3, price: 80, icon: '🗣️', effect: (state) => { state.player.attackDamage *= 1.2; } },
+            { id: 'thick_face', title: '防弹脸皮', description: '最大生命 +30，脸皮厚吃得开。', rarity: 'rare', category: 'upgrade', price: 80, icon: '🛡️', effect: (state) => { state.player.maxHp += 30; } },
+            { id: '5g_speed',
